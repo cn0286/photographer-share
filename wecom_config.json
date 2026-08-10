@@ -1,0 +1,25 @@
+{
+  "corp_id": "企业ID",
+  "agent_id": 1000002,
+  "secret": "自建应用Secret",
+  "supabase_url": "https://plrqzyojekqouyljfihe.supabase.co",
+  "supabase_anon_key": "sb_publishable_NZVl4VRf6nozXwHOyWmfUg_No564-Xi",
+  "supabase_table": "sku_records",
+  "user_map": {
+    "黄福": "huangfu",
+    "汪琪": "wangqi",
+    "瞿璋翔": "quzhangxiang",
+    "邹伟": "zouwei",
+    "祝宜舜": "zhuyishun",
+    "秦宾宾": "qinbinbin",
+    "涂志豪": "tuzhihao",
+    "付显锋": "fuxianfeng",
+    "陈云": "chenyun",
+    "甘引健": "ganyinjian",
+    "周可可": "zhoukeke",
+    "王红星": "wanghongxing",
+    "陈灿": "chencan",
+    "王雨婷": "wangyuting",
+    "樊汉书": "fanhanshu"
+  }
+}

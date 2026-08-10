@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>摄影师 SKU 共享页功能与使用说明</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", Arial, sans-serif;
+      color: #1f2937;
+      background: #f5f7fa;
+      line-height: 1.6;
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid #d9e0ea;
+      padding: 24px 28px;
+    }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+    .sub { color: #667085; font-size: 14px; }
+    main { max-width: 1120px; margin: 0 auto; padding: 22px; }
+    section {
+      background: #fff;
+      border: 1px solid #d9e0ea;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 18px;
+    }
+    h2 { margin: 0 0 14px; font-size: 19px; }
+    h3 { margin: 0 0 8px; font-size: 16px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      overflow: hidden;
+    }
+    th, td {
+      border: 1px solid #d9e0ea;
+      padding: 10px 12px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th { background: #edf2f7; }
+    .tag {
+      display: inline-block;
+      min-width: 56px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #26377a;
+      text-align: center;
+      font-size: 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .step {
+      border: 1px solid #d9e0ea;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fbfcfe;
+    }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #1f4f82;
+      color: #fff;
+      font-weight: 700;
+      margin-right: 8px;
+    }
+    .mock {
+      border: 1px solid #cfd7e3;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: #fff;
+    }
+    .mock-bar {
+      height: 32px;
+      background: #edf2f7;
+      border-bottom: 1px solid #cfd7e3;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      color: #667085;
+      font-size: 12px;
+    }
+    .mock-dot { width: 8px; height: 8px; border-radius: 50%; background: #9aa6b2; }
+    .mock-body { padding: 12px; }
+    .control-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .control {
+      border: 1px solid #c8d0da;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: #344054;
+      background: #fff;
+      min-width: 120px;
+      font-size: 13px;
+    }
+    .card {
+      border: 1px solid #d9e0ea;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .btn {
+      border: 1px solid #b9c3d0;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: #344054;
+      background: #fff;
+    }
+    .sku {
+      display: inline-block;
+      font-family: Consolas, monospace;
+      background: #eef2ff;
+      color: #26377a;
+      border-radius: 4px;
+      padding: 4px 7px;
+      margin: 3px;
+      font-size: 13px;
+    }
+    .note {
+      background: #fff8e6;
+      border: 1px solid #f4d27a;
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: #5c4300;
+      font-size: 14px;
+    }
+    .copy-block {
+      background: #f8fafc;
+      border: 1px solid #d9e0ea;
+      border-radius: 8px;
+      padding: 12px;
+      white-space: pre-wrap;
+      font-size: 14px;
+    }
+    @media (max-width: 760px) {
+      main { padding: 12px; }
+      .grid { grid-template-columns: 1fr; }
+      table { font-size: 13px; }
+      th, td { padding: 8px; }
+      .card-head { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>摄影师 SKU 共享页功能与使用说明</h1>
+    <div class="sub">适用于摄影师在电脑或手机企业微信中查看每日分配 SKU、筛选历史数据、复制拍摄清单。</div>
+  </header>
+  <main>
+    <section>
+      <h2>一、功能总览表</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 120px;">类别</th>
+            <th style="width: 180px;">功能</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="tag">查看</span></td><td>日期筛选</td><td>可以切换不同日期，查看当天或往日 SKU。</td></tr>
+          <tr><td><span class="tag">查看</span></td><td>摄影师筛选</td><td>选择自己的名字即可查看个人数据，名字按字母 A 到 Z 排序。</td></tr>
+          <tr><td><span class="tag">查看</span></td><td>无 SKU 也显示姓名</td><td>当天没有分配 SKU 的摄影师，也会显示“当天暂无 SKU”。</td></tr>
+          <tr><td><span class="tag">搜索</span></td><td>SKU 搜索</td><td>支持输入完整或部分 SKU，匹配结果会高亮。</td></tr>
+          <tr><td><span class="tag">搜索</span></td><td>前缀筛选</td><td>可按编码前缀筛选，例如 MRK、HUU、QUN。</td></tr>
+          <tr><td><span class="tag">复制</span></td><td>复制 SKU</td><td>一键复制当前卡片中显示的 SKU。</td></tr>
+          <tr><td><span class="tag">复制</span></td><td>复制完整消息</td><td>复制包含日期、摄影师、SKU、总数的完整文本。</td></tr>
+          <tr><td><span class="tag">分享</span></td><td>复制个人链接</td><td>复制个人专属链接，打开后自动筛选到对应摄影师。</td></tr>
+          <tr><td><span class="tag">提醒</span></td><td>重复 SKU 提醒</td><td>如果同一天 SKU 被分给多人，页面会显示重复提示。</td></tr>
+          <tr><td><span class="tag">管理</span></td><td>状态标记</td><td>管理员模式可标记待拍摄、已拍摄、需重拍、已完成。</td></tr>
+          <tr><td><span class="tag">管理</span></td><td>备注</td><td>管理员模式可填写备注，例如优先拍、样衣未到、需要重拍。</td></tr>
+          <tr><td><span class="tag">记录</span></td><td>导入记录</td><td>管理员模式可查看最近导入的文件、日期和 SKU 数。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>二、页面示意图</h2>
+      <div class="mock">
+        <div class="mock-bar"><span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span><span>摄影师 SKU 共享查看页</span></div>
+        <div class="mock-body">
+          <div class="control-row">
+            <div class="control">日期：8.5日</div>
+            <div class="control">摄影师：樊汉书</div>
+            <div class="control">SKU：HUU</div>
+            <div class="control">前缀：HUU</div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <strong>樊汉书</strong>
+              <div><span class="btn">复制 SKU</span> <span class="btn">复制完整消息</span> <span class="btn">复制个人链接</span></div>
+            </div>
+            <div style="color:#667085;font-size:13px;margin-bottom:8px;">8.5日　序号：19～26　总数：8</div>
+            <span class="sku">QIR3467</span><span class="sku">DY2933</span><span class="sku">LER4280</span><span class="sku">JGG4338</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>三、摄影师使用步骤</h2>
+      <div class="grid">
+        <div class="step">
+          <h3><span class="step-num">1</span>打开共享页</h3>
+          <p>在电脑或手机企业微信中打开管理员发出的共享页面链接。</p>
+        </div>
+        <div class="step">
+          <h3><span class="step-num">2</span>选择日期</h3>
+          <p>默认显示最新日期；如需查看往日数据，在“日期”下拉框切换。</p>
+        </div>
+        <div class="step">
+          <h3><span class="step-num">3</span>选择自己的名字</h3>
+          <p>在“摄影师”下拉框选择自己的名字。选择后页面会记住，下次打开会自动回到本人数据。</p>
+        </div>
+        <div class="step">
+          <h3><span class="step-num">4</span>搜索 SKU</h3>
+          <p>如需查找某个 SKU，可在 SKU 输入框输入完整或部分编码，也可以按前缀筛选。</p>
+        </div>
+        <div class="step">
+          <h3><span class="step-num">5</span>复制清单</h3>
+          <p>点击“复制 SKU”复制编码列表；点击“复制完整消息”复制带日期和总数的完整文本。</p>
+        </div>
+        <div class="step">
+          <h3><span class="step-num">6</span>查看提示</h3>
+          <p>当天没有 SKU 时会显示“当天暂无 SKU”；如出现重复 SKU，页面会提醒。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>四、说明</h2>
+      <div class="copy-block">以后摄影 SKU 都会更新在共享页面里。
+大家打开后选择自己的名字即可查看；页面支持按日期、SKU 和前缀筛选。
+当天没有 SKU 的摄影师也会显示“当天暂无 SKU”。
+需要复制清单时，可点击“复制 SKU”或“复制完整消息”。</div>
+    </section>
+
+    <section>
+      <h2>五、管理员模式图文说明</h2>
+      <div class="grid">
+        <div class="step">
+          <h3><span class="step-num">1</span>切换管理员模式</h3>
+          <p>在页面顶部“模式”下拉框中选择“管理员”，页面会显示导入记录、状态和备注功能。</p>
+          <div class="mock">
+            <div class="mock-body">
+              <div class="control-row">
+                <div class="control">模式：管理员</div>
+                <div class="control">日期：8.5日</div>
+                <div class="control">摄影师：全部摄影师</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step">
+          <h3><span class="step-num">2</span>查看导入记录</h3>
+          <p>管理员模式下方会显示最近导入的文件、导入时间、包含日期和 SKU 数，方便确认当天数据是否已更新。</p>
+          <div class="mock">
+            <div class="mock-body">
+              <div class="card">
+                <strong>导入记录</strong>
+                <p style="margin:8px 0 0;color:#667085;font-size:13px;">2026-08-05 15:30　DOU2466-系列编码清单.xlsx　日期：8.5日　SKU：43</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step">
+          <h3><span class="step-num">3</span>标记拍摄状态</h3>
+          <p>每位摄影师卡片下方可以选择状态：待拍摄、已拍摄、需重拍、已完成。适合管理员追踪进度。</p>
+          <div class="mock">
+            <div class="mock-body">
+              <div class="card">
+                <div class="card-head"><strong>樊汉书</strong><span class="btn">复制完整消息</span></div>
+                <div class="control-row">
+                  <div class="control">状态：已拍摄</div>
+                </div>
+                <span class="sku">QIR3467</span><span class="sku">DY2933</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="step">
+          <h3><span class="step-num">4</span>填写管理员备注</h3>
+          <p>备注可写“优先拍”“样衣未到”“需要重拍”等信息。备注和状态会保存在当前浏览器。</p>
+          <div class="mock">
+            <div class="mock-body">
+              <div class="card">
+                <strong>管理员备注</strong>
+                <p style="margin:8px 0 0;color:#667085;font-size:13px;">优先拍，客户急单；其中 HUU0572 需要重拍。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>六、注意事项</h2>
+      <div class="note">如果页面没有显示最新数据，请刷新页面后再查看。管理员每天导入新 Excel 后，往日数据会保留，不会被覆盖。</div>
+    </section>
+  </main>
+</body>
+</html>

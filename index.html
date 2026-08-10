@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <title>摄影师共享 SKU 查看页</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Microsoft YaHei", Arial, sans-serif; color: #1f2937; background: #f4f6f8; }
+    header { padding: 18px 24px; background: #fff; border-bottom: 1px solid #dde3ea; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    h1 { margin: 0; font-size: 20px; }
+    .updated { color: #667085; font-size: 13px; white-space: nowrap; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 24px; background: #fff; border-bottom: 1px solid #dde3ea; align-items: center; }
+    label { font-size: 13px; color: #4b5563; }
+    .hint { color: #8a94a6; font-size: 12px; margin-left: 4px; }
+    select, input { height: 34px; padding: 0 10px; border: 1px solid #c8d0da; border-radius: 6px; min-width: 160px; background: #fff; }
+    input { min-width: 220px; }
+    main { padding: 18px 24px; }
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .stat { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 12px 14px; }
+    .stat span { display: block; color: #667085; font-size: 12px; margin-bottom: 5px; }
+    .stat strong { font-size: 22px; }
+    .card { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+    .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .meta { color: #667085; font-size: 13px; margin-bottom: 8px; }
+    .warn { color: #b42318; font-size: 13px; margin-bottom: 8px; }
+    .name { font-size: 17px; font-weight: 700; }
+    .skus { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sku { font-family: Consolas, monospace; background: #eef2ff; color: #26377a; border-radius: 4px; padding: 4px 7px; }
+    .hit { background: #ffe58f; color: #111827; }
+    .empty-inline { color: #8a94a6; background: #f3f5f8; border-radius: 4px; padding: 4px 7px; }
+    .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+    .empty { color: #667085; padding: 24px; background: #fff; border: 1px solid #dde3ea; border-radius: 8px; }
+    .toast { position: fixed; right: 18px; bottom: 18px; background: #111827; color: #fff; padding: 10px 12px; border-radius: 6px; opacity: 0; transform: translateY(8px); transition: all .18s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .hidden { display: none; }
+    @media (max-width: 760px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .stats { grid-template-columns: 1fr; }
+      select, input { width: 100%; min-width: 0; }
+      .controls label { width: 100%; }
+      .card-head { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>摄影师共享 SKU 查看页</h1>
+    <div class="updated">最后更新时间：<span id="updatedAt">--</span></div>
+  </header>
+  <section class="controls">
+    <label>年份</label>
+    <select id="year"></select>
+    <label>日期</label>
+    <select id="date"></select>
+    <label>摄影师 <span class="hint">按字母 A 到 Z 排序</span></label>
+    <select id="name"><option value="">全部摄影师</option></select>
+    <label>SKU</label>
+    <input id="sku" placeholder="筛选 SKU，支持部分编码">
+  </section>
+  <main>
+    <section class="stats">
+      <div class="stat"><span>显示摄影师</span><strong id="statPeople">0</strong></div>
+      <div class="stat"><span>历史日期</span><strong id="statDates">0</strong></div>
+      <div class="stat"><span>总记录</span><strong id="statRows">0</strong></div>
+    </section>
+    <section id="result"></section>
+  </main>
+  <div class="toast" id="toast">已复制</div>
+
+  <script>
+    const CONFIG = {
+      url: "https://plrqzyojekqouyljfihe.supabase.co",
+      anonKey: "sb_publishable_NZVl4VRf6nozXwHOyWmfUg_No564-Xi",
+      table: "sku_records",
+      realtimeSchema: "public"
+    };
+
+    const supabaseClient = window.supabase.createClient(CONFIG.url, CONFIG.anonKey);
+
+    const state = {
+      rows: [],
+      updatedAt: "",
+      loading: false
+    };
+
+    const yearSelect = document.getElementById("year");
+    const dateSelect = document.getElementById("date");
+    const nameSelect = document.getElementById("name");
+    const skuInput = document.getElementById("sku");
+    const result = document.getElementById("result");
+    const updatedAt = document.getElementById("updatedAt");
+    const statPeople = document.getElementById("statPeople");
+    const statDates = document.getElementById("statDates");
+    const statRows = document.getElementById("statRows");
+    const toast = document.getElementById("toast");
+    const nameCollator = new Intl.Collator("zh-Hans-u-co-pinyin", { sensitivity: "base", numeric: true });
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      }[c]));
+    }
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1400);
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_err) {
+        const area = document.createElement("textarea");
+        area.value = text;
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+      }
+      showToast("已复制");
+    }
+
+    function normalizeDate(value) {
+      const text = String(value || "");
+      const yearMatch = text.match(/(20\d{2}|19\d{2})/);
+      if (yearMatch) return yearMatch[1] + "-" + text.replace(yearMatch[1], "").trim();
+      return text.trim();
+    }
+
+    function yearOfDate(date) {
+      const text = String(date || "");
+      const match = text.match(/(20\d{2}|19\d{2})/);
+      return match ? match[1] : "";
+    }
+
+    function dateSortKey(d) {
+      const parts = String(d || "").match(/\d+/g) || [];
+      const year = parseInt(yearOfDate(d), 10) || 0;
+      if (parts.length >= 3) return [parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, parseInt(parts[2], 10) || 0, String(d)];
+      if (parts.length === 2) return [year, parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, String(d)];
+      if (parts.length === 1) return [year, parseInt(parts[0], 10) || 0, 0, String(d)];
+      return [9999, 99, 99, String(d)];
+    }
+
+    function allDates() {
+      return [...new Set(state.rows.map(r => r.shoot_date))].filter(Boolean).sort((a, b) => {
+        const ka = dateSortKey(a), kb = dateSortKey(b);
+        for (let i = 0; i < 4; i++) if (ka[i] !== kb[i]) return ka[i] > kb[i] ? 1 : -1;
+        return 0;
+      });
+    }
+
+    function years() {
+      return [...new Set(allDates().map(yearOfDate).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
+    }
+
+    function datesForYear(year) {
+      return allDates().filter(d => yearOfDate(d) === year);
+    }
+
+    function namesForDate(date) {
+      const names = state.rows.filter(r => !date || r.shoot_date === date).map(r => r.photographer).filter(Boolean);
+      return [...new Set(names)].sort(nameCollator.compare);
+    }
+
+    function filteredRows() {
+      const d = dateSelect.value;
+      const selectedName = nameSelect.value;
+      const keyword = skuInput.value.trim().toLowerCase();
+      return state.rows.filter(row => {
+        if (d && row.shoot_date !== d) return false;
+        if (selectedName && row.photographer !== selectedName) return false;
+        if (keyword && !String(row.sku || "").toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+    }
+
+    function refreshYears() {
+      const keep = yearSelect.value;
+      const list = years();
+      yearSelect.innerHTML = '<option value="">全部年份</option>' + list.map(y => `<option value="${esc(y)}">${esc(y)}</option>`).join("");
+      if (list.includes(keep)) yearSelect.value = keep;
+      else if (list.length) yearSelect.value = list[list.length - 1];
+    }
+
+    function refreshDatesForYear() {
+      const keep = dateSelect.value;
+      const year = yearSelect.value;
+      const list = year ? datesForYear(year) : allDates();
+      dateSelect.innerHTML = '<option value="">全部日期</option>' + list.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join("");
+      if (list.includes(keep)) dateSelect.value = keep;
+    }
+
+    function refreshNames() {
+      const keep = nameSelect.value;
+      const date = dateSelect.value;
+      const list = namesForDate(date);
+      nameSelect.innerHTML = '<option value="">全部摄影师</option>' + list.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+      if (list.includes(keep)) nameSelect.value = keep;
+    }
+
+    function render() {
+      const rows = filteredRows();
+      statRows.textContent = rows.length;
+      statDates.textContent = allDates().length;
+      statPeople.textContent = new Set(rows.map(r => r.photographer)).size;
+      updatedAt.textContent = state.updatedAt || "--";
+
+      if (!rows.length) {
+        result.innerHTML = '<div class="empty">没有匹配的数据</div>';
+        return;
+      }
+
+      const grouped = [];
+      const map = new Map();
+      for (const row of rows) {
+        const key = `${row.shoot_date}||${row.photographer}`;
+        if (!map.has(key)) {
+          map.set(key, { shoot_date: row.shoot_date, photographer: row.photographer, items: [] });
+          grouped.push(map.get(key));
+        }
+        map.get(key).items.push(row);
+      }
+
+      result.innerHTML = grouped.map(group => {
+        const skus = group.items.map(x => String(x.sku || "").trim()).filter(Boolean);
+        const status = group.items[0]?.status || "";
+        const remark = group.items[0]?.remark || "";
+        return `
+          <article class="card">
+            <div class="card-head">
+              <div class="name">${esc(group.photographer)}</div>
+              <div class="tools">
+                <button type="button" onclick="copyText(${JSON.stringify(skus.join('\\n'))})">复制 SKU</button>
+                <button type="button" onclick="copyText(${JSON.stringify(`${group.shoot_date} 拍摄产品信息\n摄影师：${group.photographer}\n产品信息/sku：\n${skus.join('\n')}\n总数/件：${skus.length}`)})">复制完整消息</button>
+              </div>
+            </div>
+            <div class="meta">${esc(group.shoot_date)}　${esc(status)}　${esc(remark)}　总数：${skus.length}</div>
+            <div class="skus">${skus.length ? skus.map(s => `<span class="sku">${esc(s)}</span>`).join("") : '<span class="empty-inline">当天暂无 SKU</span>'}</div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    async function loadRows() {
+      state.loading = true;
+      const { data, error } = await supabaseClient
+        .from(CONFIG.table)
+        .select("shoot_date, photographer, sku, status, remark, updated_at, created_at")
+        .order("shoot_date", { ascending: true })
+        .order("photographer", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      state.loading = false;
+      if (error) throw error;
+      state.rows = data || [];
+      state.updatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
+      refreshYears();
+      refreshDatesForYear();
+      refreshNames();
+      render();
+    }
+
+    function setupRealtime() {
+      const channel = supabaseClient
+        .channel("sku-records-realtime")
+        .on("postgres_changes", {
+          event: "*",
+          schema: CONFIG.realtimeSchema,
+          table: CONFIG.table
+        }, () => {
+          loadRows().catch(err => {
+            result.innerHTML = `<div class="empty">刷新失败：${esc(err?.message || err)}</div>`;
+          });
+        })
+        .subscribe();
+
+      window.addEventListener("beforeunload", () => {
+        supabaseClient.removeChannel(channel);
+      });
+    }
+
+    yearSelect.addEventListener("change", () => {
+      refreshDatesForYear();
+      refreshNames();
+      render();
+    });
+
+    dateSelect.addEventListener("change", () => {
+      refreshNames();
+      render();
+    });
+
+    nameSelect.addEventListener("change", render);
+    skuInput.addEventListener("input", render);
+
+    loadRows()
+      .then(setupRealtime)
+      .catch(err => {
+        result.innerHTML = `<div class="empty">加载失败：${esc(err?.message || err)}</div>`;
+      });
+  </script>
+</body>
+</html>

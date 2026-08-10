@@ -1,0 +1,27 @@
+如果小程序导入后提示 Supabase 同步失败，或网页仍然显示“没有匹配的数据”，
+请在 Supabase 的 SQL Editor 里执行下面这段，只需要执行一次。
+
+alter table public.sku_records enable row level security;
+
+drop policy if exists "public read" on public.sku_records;
+drop policy if exists "public insert" on public.sku_records;
+drop policy if exists "public update" on public.sku_records;
+
+create policy "public read"
+on public.sku_records
+for select
+to anon
+using (true);
+
+create policy "public insert"
+on public.sku_records
+for insert
+to anon
+with check (true);
+
+create policy "public update"
+on public.sku_records
+for update
+to anon
+using (true)
+with check (true);
