@@ -29,6 +29,11 @@
     .warn { color: #b42318; font-size: 13px; margin-bottom: 8px; }
     .name { font-size: 17px; font-weight: 700; }
     .skus { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sample-groups { display: grid; gap: 10px; }
+    .sample-group { border: 1px solid #e3e8f0; border-radius: 8px; padding: 10px 12px; background: #fafbfc; }
+    .sample-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .sample-title { font-size: 13px; font-weight: 700; color: #344054; }
+    .sample-count { font-size: 12px; color: #667085; }
     .sku { font-family: Consolas, monospace; background: #eef2ff; color: #26377a; border-radius: 4px; padding: 4px 7px; }
     .hit { background: #ffe58f; color: #111827; }
     .empty-inline { color: #8a94a6; background: #f3f5f8; border-radius: 4px; padding: 4px 7px; }
@@ -98,6 +103,23 @@
     const statRows = document.getElementById("statRows");
     const toast = document.getElementById("toast");
     const nameCollator = new Intl.Collator("zh-Hans-u-co-pinyin", { sensitivity: "base", numeric: true });
+    const photographerRoster = [
+      "祝宜舜",
+      "陈灿",
+      "陈云",
+      "樊汉书",
+      "付显锋",
+      "秦宾宾",
+      "瞿璋翔",
+      "涂志豪",
+      "汪琪",
+      "王红星",
+      "王雨婷",
+      "周可可",
+      "邹伟",
+      "黄福",
+      "甘引健"
+    ].sort(nameCollator.compare);
 
     function esc(s) {
       return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -165,7 +187,9 @@
 
     function namesForDate(date) {
       const names = state.rows.filter(r => !date || r.shoot_date === date).map(r => r.photographer).filter(Boolean);
-      return [...new Set(names)].sort(nameCollator.compare);
+      const detected = [...new Set(names)].sort(nameCollator.compare);
+      const merged = [...new Set([...photographerRoster, ...detected])];
+      return merged.sort(nameCollator.compare);
     }
 
     function filteredRows() {
@@ -178,6 +202,40 @@
         if (keyword && !String(row.sku || "").toLowerCase().includes(keyword)) return false;
         return true;
       });
+    }
+
+    function skuPrefix(value) {
+      const text = String(value || "").trim();
+      if (!text) return "未填写";
+      const match = text.match(/^[A-Za-z]+/);
+      if (match) return match[0].toUpperCase();
+      return "其他";
+    }
+
+    function buildSkuGroups(items) {
+      const map = new Map();
+      for (const item of items) {
+        const sku = String(item.sku || "").trim();
+        const prefix = skuPrefix(sku);
+        if (!map.has(prefix)) map.set(prefix, []);
+        map.get(prefix).push(sku);
+      }
+      return [...map.entries()]
+        .map(([prefix, skus]) => ({ prefix, skus: skus.filter(Boolean) }))
+        .sort((a, b) => nameCollator.compare(a.prefix, b.prefix));
+    }
+
+    function buildCompleteMessage(group, skuGroups) {
+      const lines = [
+        `${group.shoot_date} 拍摄产品信息`,
+        `摄影师：${group.photographer}`,
+        `产品信息/sku：`
+      ];
+      for (const sub of skuGroups) {
+        lines.push(`【${sub.prefix} 样品组】${sub.skus.join("，")}`);
+      }
+      lines.push(`总数/件：${skuGroups.reduce((sum, sub) => sum + sub.skus.length, 0)}`);
+      return lines.join("\n");
     }
 
     function refreshYears() {
@@ -208,13 +266,8 @@
       const rows = filteredRows();
       statRows.textContent = rows.length;
       statDates.textContent = allDates().length;
-      statPeople.textContent = new Set(rows.map(r => r.photographer)).size;
+      statPeople.textContent = photographerRoster.length;
       updatedAt.textContent = state.updatedAt || "--";
-
-      if (!rows.length) {
-        result.innerHTML = '<div class="empty">没有匹配的数据</div>';
-        return;
-      }
 
       const grouped = [];
       const map = new Map();
@@ -227,23 +280,57 @@
         map.get(key).items.push(row);
       }
 
-      result.innerHTML = grouped.map(group => {
-        const skus = group.items.map(x => String(x.sku || "").trim()).filter(Boolean);
-        const status = group.items[0]?.status || "";
-        const remark = group.items[0]?.remark || "";
-        return `
-          <article class="card">
-            <div class="card-head">
-              <div class="name">${esc(group.photographer)}</div>
-              <div class="tools">
-                <button type="button" onclick="copyText(${JSON.stringify(skus.join('\\n'))})">复制 SKU</button>
-                <button type="button" onclick="copyText(${JSON.stringify(`${group.shoot_date} 拍摄产品信息\n摄影师：${group.photographer}\n产品信息/sku：\n${skus.join('\n')}\n总数/件：${skus.length}`)})">复制完整消息</button>
+      const currentDate = dateSelect.value;
+      const roster = photographerRoster;
+      result.innerHTML = roster.map(name => {
+        const personRows = rows.filter(r => r.photographer === name);
+        const personDateRows = currentDate ? personRows.filter(r => r.shoot_date === currentDate) : personRows;
+        if (!personDateRows.length) {
+          return `
+            <article class="card">
+              <div class="card-head">
+                <div class="name">${esc(name)}</div>
               </div>
-            </div>
-            <div class="meta">${esc(group.shoot_date)}　${esc(status)}　${esc(remark)}　总数：${skus.length}</div>
-            <div class="skus">${skus.length ? skus.map(s => `<span class="sku">${esc(s)}</span>`).join("") : '<span class="empty-inline">当天暂无 SKU</span>'}</div>
-          </article>
-        `;
+              <div class="meta">当日暂无样品</div>
+              <div class="empty-inline">当日暂无样品</div>
+            </article>
+          `;
+        }
+        const groupedByDate = new Map();
+        for (const row of personDateRows) {
+          const dateKey = row.shoot_date || "未填写日期";
+          if (!groupedByDate.has(dateKey)) groupedByDate.set(dateKey, []);
+          groupedByDate.get(dateKey).push(row);
+        }
+        return [...groupedByDate.entries()].map(([shootDate, items]) => {
+          const skuGroups = buildSkuGroups(items);
+          const skus = skuGroups.flatMap(sub => sub.skus);
+          const status = items[0]?.status || "";
+          const remark = items[0]?.remark || "";
+          return `
+            <article class="card">
+              <div class="card-head">
+                <div class="name">${esc(name)}</div>
+                <div class="tools">
+                  <button type="button" onclick="copyText(${JSON.stringify(skus.join('\\n'))})">复制 SKU</button>
+                  <button type="button" onclick="copyText(${JSON.stringify(buildCompleteMessage({ shoot_date: shootDate, photographer: name }, skuGroups))})">复制完整消息</button>
+                </div>
+              </div>
+              <div class="meta">${esc(shootDate)}　${esc(status)}　${esc(remark)}　总数：${skus.length}</div>
+              <div class="sample-groups">
+                ${skuGroups.length ? skuGroups.map(sub => `
+                  <div class="sample-group">
+                    <div class="sample-head">
+                      <span class="sample-title">${esc(sub.prefix)} 样品组</span>
+                      <span class="sample-count">${sub.skus.length} 个SKU</span>
+                    </div>
+                    <div class="skus">${sub.skus.length ? sub.skus.map(s => `<span class="sku">${esc(s)}</span>`).join("") : '<span class="empty-inline">暂无 SKU</span>'}</div>
+                  </div>
+                `).join("") : '<span class="empty-inline">当日暂无样品</span>'}
+              </div>
+            </article>
+          `;
+        }).join("");
       }).join("");
     }
 
