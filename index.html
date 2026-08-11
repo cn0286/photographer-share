@@ -333,9 +333,11 @@
 
     function render() {
       const rows = filteredRows();
+      const selectedName = nameSelect.value.trim();
+      const displayNames = selectedName ? [selectedName] : photographerRoster;
       statRows.textContent = rows.length;
       statDates.textContent = allDates().length;
-      statPeople.textContent = photographerRoster.length;
+      statPeople.textContent = displayNames.length;
       updatedAt.textContent = state.updatedAt || "--";
 
       const grouped = [];
@@ -350,8 +352,7 @@
       }
 
       const currentDate = dateSelect.value;
-      const roster = photographerRoster;
-      result.innerHTML = roster.map(name => {
+      result.innerHTML = displayNames.map(name => {
         const personRows = rows.filter(r => r.photographer === name);
         const personDateRows = currentDate ? personRows.filter(r => r.shoot_date === currentDate) : personRows;
         if (!personDateRows.length) {
