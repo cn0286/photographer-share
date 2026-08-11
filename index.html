@@ -59,6 +59,8 @@
   <section class="controls">
     <label>年份</label>
     <select id="year"></select>
+    <label>月份</label>
+    <select id="month"></select>
     <label>日期</label>
     <select id="date"></select>
     <label>摄影师 <span class="hint">按字母 A 到 Z 排序</span></label>
@@ -93,6 +95,7 @@
     };
 
     const yearSelect = document.getElementById("year");
+    const monthSelect = document.getElementById("month");
     const dateSelect = document.getElementById("date");
     const nameSelect = document.getElementById("name");
     const skuInput = document.getElementById("sku");
@@ -108,7 +111,6 @@
       "陈灿",
       "陈云",
       "樊汉书",
-      "付显锋",
       "秦宾宾",
       "瞿璋翔",
       "涂志豪",
@@ -120,6 +122,8 @@
       "黄福",
       "甘引健"
     ].sort(nameCollator.compare);
+    const hiddenPhotographers = new Set(["付显锋"]);
+    const hiddenDates = new Set(["8.8日", "8.8", "2026-8.8日", "2026-08-08"]);
 
     function esc(s) {
       return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -154,10 +158,25 @@
       return text.trim();
     }
 
+    function isHiddenDate(value) {
+      const text = String(value || "").trim();
+      const normalized = normalizeDate(text);
+      return hiddenDates.has(text) || hiddenDates.has(normalized);
+    }
+
     function yearOfDate(date) {
       const text = String(date || "");
       const match = text.match(/(20\d{2}|19\d{2})/);
       return match ? match[1] : "";
+    }
+
+    function monthOfDate(date) {
+      const month = dateSortKey(date)[1];
+      return month ? String(month).padStart(2, "0") : "";
+    }
+
+    function monthLabel(month) {
+      return month ? `${Number(month)}月` : "";
     }
 
     function dateSortKey(d) {
@@ -170,7 +189,7 @@
     }
 
     function allDates() {
-      return [...new Set(state.rows.map(r => r.shoot_date))].filter(Boolean).sort((a, b) => {
+      return [...new Set(state.rows.map(r => r.shoot_date).filter(d => !isHiddenDate(d)))].filter(Boolean).sort((a, b) => {
         const ka = dateSortKey(a), kb = dateSortKey(b);
         for (let i = 0; i < 4; i++) if (ka[i] !== kb[i]) return ka[i] > kb[i] ? 1 : -1;
         return 0;
@@ -181,22 +200,45 @@
       return [...new Set(allDates().map(yearOfDate).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
     }
 
-    function datesForYear(year) {
-      return allDates().filter(d => yearOfDate(d) === year);
+    function monthsForYear(year) {
+      return [...new Set(allDates()
+        .filter(d => !year || yearOfDate(d) === year)
+        .map(monthOfDate)
+        .filter(Boolean))]
+        .sort((a, b) => Number(a) - Number(b));
+    }
+
+    function datesForYearMonth(year, month) {
+      return allDates().filter(d => {
+        if (year && yearOfDate(d) !== year) return false;
+        if (month && monthOfDate(d) !== month) return false;
+        return true;
+      });
     }
 
     function namesForDate(date) {
-      const names = state.rows.filter(r => !date || r.shoot_date === date).map(r => r.photographer).filter(Boolean);
+      const names = state.rows
+        .filter(r => !hiddenPhotographers.has(r.photographer))
+        .filter(r => !isHiddenDate(r.shoot_date))
+        .filter(r => !date || r.shoot_date === date)
+        .map(r => r.photographer)
+        .filter(Boolean);
       const detected = [...new Set(names)].sort(nameCollator.compare);
       const merged = [...new Set([...photographerRoster, ...detected])];
       return merged.sort(nameCollator.compare);
     }
 
     function filteredRows() {
+      const y = yearSelect.value;
+      const m = monthSelect.value;
       const d = dateSelect.value;
       const selectedName = nameSelect.value;
       const keyword = skuInput.value.trim().toLowerCase();
       return state.rows.filter(row => {
+        if (hiddenPhotographers.has(row.photographer)) return false;
+        if (isHiddenDate(row.shoot_date)) return false;
+        if (y && yearOfDate(row.shoot_date) !== y) return false;
+        if (m && monthOfDate(row.shoot_date) !== m) return false;
         if (d && row.shoot_date !== d) return false;
         if (selectedName && row.photographer !== selectedName) return false;
         if (keyword && !String(row.sku || "").toLowerCase().includes(keyword)) return false;
@@ -246,12 +288,39 @@
       else if (list.length) yearSelect.value = list[list.length - 1];
     }
 
+    function refreshMonthsForYear() {
+      const keep = monthSelect.value;
+      const list = monthsForYear(yearSelect.value);
+      monthSelect.innerHTML = '<option value="">全部月份</option>' + list.map(m => `<option value="${esc(m)}">${esc(monthLabel(m))}</option>`).join("");
+      if (list.includes(keep)) monthSelect.value = keep;
+      else if (list.length) monthSelect.value = list[list.length - 1];
+    }
+
     function refreshDatesForYear() {
       const keep = dateSelect.value;
       const year = yearSelect.value;
-      const list = year ? datesForYear(year) : allDates();
+      const month = monthSelect.value;
+      const list = datesForYearMonth(year, month);
       dateSelect.innerHTML = '<option value="">全部日期</option>' + list.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join("");
       if (list.includes(keep)) dateSelect.value = keep;
+      else if (list.length) dateSelect.value = list[list.length - 1];
+    }
+
+    function syncDefaultDatePath() {
+      if (!yearSelect.value) {
+        const yearsList = years();
+        if (yearsList.length) yearSelect.value = yearsList[yearsList.length - 1];
+      }
+      refreshMonthsForYear();
+      if (!monthSelect.value) {
+        const monthsList = monthsForYear(yearSelect.value);
+        if (monthsList.length) monthSelect.value = monthsList[monthsList.length - 1];
+      }
+      refreshDatesForYear();
+      if (!dateSelect.value) {
+        const datesList = datesForYearMonth(yearSelect.value, monthSelect.value);
+        if (datesList.length) dateSelect.value = datesList[datesList.length - 1];
+      }
     }
 
     function refreshNames() {
@@ -348,6 +417,8 @@
       state.rows = data || [];
       state.updatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
       refreshYears();
+      syncDefaultDatePath();
+      refreshMonthsForYear();
       refreshDatesForYear();
       refreshNames();
       render();
@@ -373,6 +444,16 @@
     }
 
     yearSelect.addEventListener("change", () => {
+      monthSelect.value = "";
+      dateSelect.value = "";
+      refreshMonthsForYear();
+      refreshDatesForYear();
+      refreshNames();
+      render();
+    });
+
+    monthSelect.addEventListener("change", () => {
+      dateSelect.value = "";
       refreshDatesForYear();
       refreshNames();
       render();
