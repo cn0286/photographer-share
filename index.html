@@ -190,7 +190,9 @@
     function parseAssignmentLine(text) {
       const value = norm(text);
       if (!value) return null;
-      const match = value.match(/^([\u4e00-\u9fffA-Za-z]+)\s*(.*)$/);
+      if (!/[\u4e00-\u9fff]/.test(value)) return null;
+      if (looksLikeCode(value)) return null;
+      const match = value.match(/^([\u4e00-\u9fff]{2,6})\s*(.*)$/);
       if (!match) return null;
       const name = match[1].trim();
       const indexes = parseRanges(match[2]);
