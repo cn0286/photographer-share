@@ -41,6 +41,12 @@
     .empty { color: #667085; padding: 24px; background: #fff; border: 1px solid #dde3ea; border-radius: 8px; }
     .toast { position: fixed; right: 18px; bottom: 18px; background: #111827; color: #fff; padding: 10px 12px; border-radius: 6px; opacity: 0; transform: translateY(8px); transition: all .18s ease; }
     .toast.show { opacity: 1; transform: translateY(0); }
+    .copy-modal { position: fixed; inset: 0; background: rgba(15, 23, 42, .42); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 20; }
+    .copy-modal.show { display: flex; }
+    .copy-box { width: min(620px, 100%); background: #fff; border-radius: 8px; border: 1px solid #dde3ea; padding: 16px; box-shadow: 0 18px 50px rgba(15, 23, 42, .22); }
+    .copy-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; font-weight: 700; }
+    .copy-box textarea { width: 100%; min-height: 220px; border: 1px solid #c8d0da; border-radius: 6px; padding: 10px; resize: vertical; font-family: Consolas, "Microsoft YaHei", monospace; line-height: 1.5; }
+    .copy-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
     .hidden { display: none; }
     @media (max-width: 760px) {
       header { align-items: flex-start; flex-direction: column; }
@@ -77,6 +83,19 @@
     <section id="result"></section>
   </main>
   <div class="toast" id="toast">已复制</div>
+  <div class="copy-modal" id="copyModal">
+    <div class="copy-box">
+      <div class="copy-head">
+        <span>手动复制</span>
+        <button type="button" onclick="closeCopyModal()">关闭</button>
+      </div>
+      <textarea id="copyFallbackText" readonly></textarea>
+      <div class="copy-actions">
+        <button type="button" onclick="selectFallbackText()">全选内容</button>
+        <button type="button" onclick="closeCopyModal()">完成</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const CONFIG = {
@@ -105,6 +124,8 @@
     const statDates = document.getElementById("statDates");
     const statRows = document.getElementById("statRows");
     const toast = document.getElementById("toast");
+    const copyModal = document.getElementById("copyModal");
+    const copyFallbackText = document.getElementById("copyFallbackText");
     const nameCollator = new Intl.Collator("zh-Hans-u-co-pinyin", { sensitivity: "base", numeric: true });
     const photographerRoster = [
       "祝宜舜",
@@ -137,18 +158,53 @@
       setTimeout(() => toast.classList.remove("show"), 1400);
     }
 
+    function openCopyModal(text) {
+      copyFallbackText.value = text;
+      copyModal.classList.add("show");
+      setTimeout(() => {
+        copyFallbackText.focus();
+        copyFallbackText.select();
+      }, 30);
+      showToast("请手动复制");
+    }
+
+    function closeCopyModal() {
+      copyModal.classList.remove("show");
+    }
+
+    function selectFallbackText() {
+      copyFallbackText.focus();
+      copyFallbackText.select();
+    }
+
     async function copyText(text) {
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch (_err) {
-        const area = document.createElement("textarea");
-        area.value = text;
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand("copy");
-        area.remove();
+      const content = String(text || "");
+      if (!content) {
+        showToast("没有可复制内容");
+        return;
       }
-      showToast("已复制");
+      try {
+        if (!navigator.clipboard || !window.isSecureContext) throw new Error("clipboard unavailable");
+        await navigator.clipboard.writeText(content);
+        showToast("已复制");
+      } catch (_err) {
+        try {
+          const area = document.createElement("textarea");
+          area.value = content;
+          area.setAttribute("readonly", "");
+          area.style.position = "fixed";
+          area.style.left = "-9999px";
+          document.body.appendChild(area);
+          area.focus();
+          area.select();
+          const ok = document.execCommand("copy");
+          area.remove();
+          if (!ok) throw new Error("execCommand failed");
+          showToast("已复制");
+        } catch (_fallbackErr) {
+          openCopyModal(content);
+        }
+      }
     }
 
     function normalizeDate(value) {
