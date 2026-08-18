@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <title>&#25668;&#24433;&#20135;&#21697;&#20449;&#24687;&#19978;&#20256;&#21518;&#21488;</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Microsoft YaHei", Arial, sans-serif; background: #f4f6f8; color: #1f2937; }
+    header { background: #fff; border-bottom: 1px solid #dde3ea; padding: 16px 22px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 20px; }
+    a { color: #2563eb; text-decoration: none; }
+    .wrap { padding: 18px 22px 30px; max-width: 1180px; margin: 0 auto; }
+    .card { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    input[type=file] { height: 38px; padding: 7px 10px; border: 1px solid #c8d0da; border-radius: 6px; background: #fff; min-width: 290px; }
+    button { height: 38px; border: 0; border-radius: 6px; padding: 0 14px; cursor: pointer; font-family: inherit; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    .primary { background: #2563eb; color: #fff; }
+    .ghost { background: #e9eef6; color: #1f2937; }
+    .danger { background: #fee2e2; color: #991b1b; }
+    .status { font-size: 13px; color: #667085; }
+    .muted { color: #667085; font-size: 13px; line-height: 1.7; }
+    .preview { white-space: pre-wrap; font-family: Consolas, "Microsoft YaHei", monospace; background: #fafbfc; border: 1px solid #e3e8f0; border-radius: 8px; padding: 12px; min-height: 260px; max-height: 520px; overflow: auto; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .stat { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 12px 14px; }
+    .stat span { display: block; color: #667085; font-size: 12px; margin-bottom: 4px; }
+    .stat strong { font-size: 22px; }
+    .ok { color: #166534; }
+    .err { color: #b42318; }
+    .toast { position: fixed; right: 18px; bottom: 18px; background: #111827; color: #fff; padding: 10px 12px; border-radius: 6px; opacity: 0; transform: translateY(8px); transition: all .18s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    @media (max-width: 760px) {
+      .stats { grid-template-columns: 1fr 1fr; }
+      input[type=file], button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>&#25668;&#24433;&#20135;&#21697;&#20449;&#24687;&#19978;&#20256;&#21518;&#21488;</h1>
+    <div class="status" id="status">&#35831;&#36873;&#25321; Excel &#25991;&#20214;</div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="row">
+        <input id="file" type="file" accept=".xlsx,.xlsm,.xls">
+        <button class="primary" id="parseBtn">&#35835;&#21462;&#39044;&#35272;</button>
+        <button class="ghost" id="uploadBtn" disabled>&#35206;&#30422;&#19978;&#20256;&#21040;&#32593;&#39029;&#21518;&#21488;</button>
+        <button class="danger" id="clearBtn">&#28165;&#31354;&#39044;&#35272;</button>
+        <a href="./index.html" target="_blank">&#25171;&#24320;&#25668;&#24433;&#24072;&#20849;&#20139;&#39029;</a>
+      </div>
+      <p class="muted">
+        &#36825;&#20010;&#39029;&#38754;&#21482;&#32473;&#31649;&#29702;&#21592;&#19978;&#20256;&#20351;&#29992;&#12290;&#19978;&#20256;&#26102;&#20250;&#20808;&#21024;&#38500;&#39044;&#35272;&#20013;&#23545;&#24212;&#26085;&#26399;&#30340;&#26087;&#25968;&#25454;&#65292;&#20877;&#20889;&#20837;&#26032;&#25968;&#25454;&#12290;&#20363;&#22914; 8 &#26376; 14 &#26085;&#20256;&#38169;&#20102;&#65292;&#20877;&#20256;&#19968;&#27425;&#27491;&#30830;&#34920;&#26684;&#23601;&#20250;&#35206;&#30422; 8 &#26376; 14 &#26085;&#12290;
+      </p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span>&#26085;&#26399;&#25968;</span><strong id="statDates">0</strong></div>
+      <div class="stat"><span>&#25668;&#24433;&#24072;&#25968;</span><strong id="statPeople">0</strong></div>
+      <div class="stat"><span>SKU &#25968;</span><strong id="statSku">0</strong></div>
+      <div class="stat"><span>&#29366;&#24577;</span><strong id="statState">-</strong></div>
+    </div>
+
+    <div class="card">
+      <div class="muted" style="margin-bottom: 8px;">&#35299;&#26512;&#39044;&#35272;</div>
+      <div id="preview" class="preview">&#23578;&#26410;&#35835;&#21462;&#25991;&#20214;&#12290;</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">&#24050;&#23436;&#25104;</div>
+
+  <script>
+    const CONFIG = {
+      url: "https://plrqzyojekqouyljfihe.supabase.co",
+      anonKey: "sb_publishable_NZVl4VRf6nozXwHOyWmfUg_No564-Xi",
+      table: "sku_records"
+    };
+
+    const TEXT = {
+      choose: "\u8bf7\u9009\u62e9 Excel \u6587\u4ef6",
+      reading: "\u6b63\u5728\u8bfb\u53d6 Excel...",
+      readOk: "\u8bfb\u53d6\u6210\u529f",
+      readFail: "\u8bfb\u53d6\u5931\u8d25",
+      uploadFirst: "\u8bf7\u5148\u8bfb\u53d6\u9884\u89c8",
+      deleteOld: "\u6b63\u5728\u5220\u9664\u65e7\u6570\u636e...",
+      insertNew: "\u6b63\u5728\u5199\u5165\u65b0\u6570\u636e...",
+      uploadOk: "\u4e0a\u4f20\u6210\u529f",
+      uploadFail: "\u4e0a\u4f20\u5931\u8d25",
+      emptyPreview: "\u5c1a\u672a\u8bfb\u53d6\u6587\u4ef6\u3002",
+      normal: "\u6b63\u5e38",
+      abnormal: "\u5f02\u5e38",
+      noData: "\u6ca1\u6709\u8bfb\u53d6\u5230\u53ef\u4e0a\u4f20\u7684 SKU\u3002\u8bf7\u68c0\u67e5\u8868\u683c\u91cc\u662f\u5426\u6709\u65e5\u671f\u3001\u6444\u5f71\u5e08\u59d3\u540d\u3001SKU/\u7f16\u7801\u3002",
+      willReplace: "\u5c06\u8986\u76d6\u65e5\u671f",
+      people: "\u6444\u5f71\u5e08",
+      total: "SKU \u603b\u6570",
+      waitShoot: "\u5f85\u62cd\u6444",
+      confirmA: "\u672c\u6b21\u4f1a\u8986\u76d6\u8fd9\u4e9b\u65e5\u671f\u7684\u65e7\u6570\u636e\uff1a",
+      confirmB: "\u786e\u8ba4\u7ee7\u7eed\u4e0a\u4f20\u5417\uff1f",
+      deleteFail: "\u5220\u9664\u65e7\u6570\u636e\u5931\u8d25",
+      insertFail: "\u5199\u5165\u65b0\u6570\u636e\u5931\u8d25",
+      failReason: "\u4e0a\u4f20\u5931\u8d25\u539f\u56e0"
+    };
+
+    const supabaseClient = window.supabase.createClient(CONFIG.url, CONFIG.anonKey);
+    const els = {
+      file: document.getElementById("file"),
+      parseBtn: document.getElementById("parseBtn"),
+      uploadBtn: document.getElementById("uploadBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      preview: document.getElementById("preview"),
+      status: document.getElementById("status"),
+      statDates: document.getElementById("statDates"),
+      statPeople: document.getElementById("statPeople"),
+      statSku: document.getElementById("statSku"),
+      statState: document.getElementById("statState"),
+      toast: document.getElementById("toast")
+    };
+
+    let parsed = [];
+
+    function toast(text) {
+      els.toast.textContent = text;
+      els.toast.classList.add("show");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => els.toast.classList.remove("show"), 1500);
+    }
+
+    function setState(text, ok = true) {
+      els.status.textContent = text;
+      els.statState.textContent = ok ? TEXT.normal : TEXT.abnormal;
+      els.statState.className = ok ? "ok" : "err";
+    }
+
+    function norm(value) {
+      return String(value ?? "").replace(/\u00a0/g, " ").trim();
+    }
+
+    function excelSerialToDate(serial) {
+      const utcDays = Math.floor(Number(serial) - 25569);
+      const date = new Date(utcDays * 86400 * 1000);
+      if (Number.isNaN(date.getTime())) return "";
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+    }
+
+    function normalizeDate(value) {
+      const raw = norm(value);
+      if (!raw) return "";
+      if (/^\d{5}$/.test(raw)) return excelSerialToDate(raw);
+      const nums = raw.match(/\d+/g) || [];
+      const yearNow = new Date().getFullYear();
+      if (nums.length >= 3) return `${nums[0]}-${String(nums[1]).padStart(2, "0")}-${String(nums[2]).padStart(2, "0")}`;
+      if (nums.length === 2) return `${yearNow}-${String(nums[0]).padStart(2, "0")}-${String(nums[1]).padStart(2, "0")}`;
+      return raw;
+    }
+
+    function looksLikeDate(value) {
+      const text = norm(value);
+      if (!text) return false;
+      if (/^\d{5}$/.test(text)) return true;
+      return /\d{1,4}\s*[年./-]?\s*\d{1,2}\s*[月./-]\s*\d{1,2}\s*日?|\d{1,2}\s*[./-]\s*\d{1,2}\s*日?/.test(text);
+    }
+
+    function looksLikeCode(value) {
+      return /^[A-Za-z]{1,8}\d+[A-Za-z0-9]*(?:\s+\d+)?$/.test(norm(value));
+    }
+
+    function parseRanges(text) {
+      const nums = [];
+      const re = /(\d+)\s*(?:~|～|-|至|到)\s*(\d+)|(\d+)/g;
+      let match;
+      while ((match = re.exec(text || ""))) {
+        if (match[3]) {
+          nums.push(Number(match[3]));
+        } else {
+          const start = Number(match[1]);
+          const end = Number(match[2]);
+          const step = start <= end ? 1 : -1;
+          for (let n = start; n !== end + step; n += step) nums.push(n);
+        }
+      }
+      return [...new Set(nums)].filter(n => Number.isFinite(n) && n > 0);
+    }
+
+    function parseAssignmentLine(text) {
+      const value = norm(text);
+      if (!value) return null;
+      if (!/[\u4e00-\u9fff]/.test(value)) return null;
+      if (looksLikeCode(value)) return null;
+      const match = value.match(/^([\u4e00-\u9fff]{2,6})\s*(.*)$/);
+      if (!match) return null;
+      const name = match[1].trim();
+      const indexes = parseRanges(match[2]);
+      if (!name || indexes.length === 0) return null;
+      return { name, indexes };
+    }
+
+    function findStandardHeaders(rows) {
+      for (let r = 0; r < Math.min(rows.length, 12); r++) {
+        const found = {};
+        for (let c = 0; c < (rows[r] || []).length; c++) {
+          const text = norm(rows[r][c]).toLowerCase().replace(/\s+/g, "");
+          if (!text) continue;
+          if (text.includes("日期")) found.date = c;
+          if (text.includes("姓名") || text.includes("摄影师")) found.name = c;
+          if (text.includes("sku") || text.includes("产品信息") || text.includes("编码") || text.includes("产品")) found.sku = c;
+          if (text.includes("备注")) found.remark = c;
+          if (text.includes("状态") || text.includes("完成")) found.status = c;
+        }
+        if (found.date !== undefined && found.name !== undefined && found.sku !== undefined) {
+          return { headerRow: r, headers: found };
+        }
+      }
+      return null;
+    }
+
+    function parseStandardTable(rows) {
+      const match = findStandardHeaders(rows);
+      if (!match) return [];
+      const out = [];
+      let lastDate = "";
+      let lastName = "";
+      for (let r = match.headerRow + 1; r < rows.length; r++) {
+        const row = rows[r] || [];
+        const date = normalizeDate(row[match.headers.date]) || lastDate;
+        const photographer = norm(row[match.headers.name]) || lastName;
+        const sku = norm(row[match.headers.sku]);
+        const remark = match.headers.remark !== undefined ? norm(row[match.headers.remark]) : "";
+        const status = match.headers.status !== undefined ? norm(row[match.headers.status]) : TEXT.waitShoot;
+        if (normalizeDate(row[match.headers.date])) lastDate = date;
+        if (norm(row[match.headers.name])) lastName = photographer;
+        if (!date || !photographer || !sku) continue;
+        out.push({ shoot_date: date, photographer, sku, status: status || TEXT.waitShoot, remark });
+      }
+      return out;
+    }
+
+    function findAssignmentBlocks(rows) {
+      const blocks = [];
+      for (let r = 0; r < Math.min(rows.length, 10); r++) {
+        for (let c = 1; c < (rows[r] || []).length; c++) {
+          if (looksLikeDate(rows[r][c])) blocks.push({ date: normalizeDate(rows[r][c]), codeCol: c - 1, dateRow: r });
+        }
+      }
+      return blocks;
+    }
+
+    function parseAssignmentBlock(rows, block) {
+      const rawItems = [];
+      const assignments = [];
+      let assignmentStarted = false;
+      for (let r = block.dateRow + 1; r < rows.length; r++) {
+        const text = norm(rows[r]?.[block.codeCol]);
+        if (!text) continue;
+        const assignment = parseAssignmentLine(text);
+        if (assignment) {
+          assignmentStarted = true;
+          assignments.push(assignment);
+        } else if (!assignmentStarted && looksLikeCode(text)) {
+          rawItems.push(text);
+        }
+      }
+
+      const out = [];
+      for (const assignment of assignments) {
+        for (const index of assignment.indexes) {
+          const sku = rawItems[index - 1];
+          if (!sku) continue;
+          out.push({ shoot_date: block.date, photographer: assignment.name, sku, status: TEXT.waitShoot, remark: "" });
+        }
+      }
+      return out;
+    }
+
+    function parseAssignmentTable(rows) {
+      const blocks = findAssignmentBlocks(rows);
+      const out = [];
+      for (const block of blocks) out.push(...parseAssignmentBlock(rows, block));
+      return out;
+    }
+
+    function dedupeRows(rows) {
+      const seen = new Set();
+      const out = [];
+      for (const row of rows) {
+        const key = `${row.shoot_date}|${row.photographer}|${row.sku}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(row);
+      }
+      return out;
+    }
+
+    async function loadExcel(file) {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const allRows = [];
+      for (const sheetName of wb.SheetNames) {
+        const sheet = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
+        const standardRows = parseStandardTable(rows);
+        if (standardRows.length) allRows.push(...standardRows);
+        else allRows.push(...parseAssignmentTable(rows));
+      }
+      const parsedRows = dedupeRows(allRows);
+      if (!parsedRows.length) throw new Error(TEXT.noData);
+      return parsedRows;
+    }
+
+    function updatePreview(rows) {
+      parsed = rows;
+      const dates = [...new Set(rows.map(r => r.shoot_date))].sort();
+      const people = [...new Set(rows.map(r => r.photographer))].sort((a, b) => a.localeCompare(b, "zh-Hans-u-co-pinyin"));
+      els.statDates.textContent = dates.length;
+      els.statPeople.textContent = people.length;
+      els.statSku.textContent = rows.length;
+      els.uploadBtn.disabled = rows.length === 0;
+
+      els.preview.textContent = [
+        `${TEXT.willReplace}: ${dates.join("、")}`,
+        `${TEXT.people}: ${people.join("、")}`,
+        `${TEXT.total}: ${rows.length}`,
+        "",
+        ...rows.map(r => `${r.shoot_date} | ${r.photographer} | ${r.sku}`)
+      ].join("\n");
+    }
+
+    async function deleteExistingDates(dates) {
+      for (const date of dates) {
+        const { error } = await supabaseClient.from(CONFIG.table).delete().eq("shoot_date", date);
+        if (error) throw new Error(`${date} ${TEXT.deleteFail}: ${error.message}`);
+      }
+    }
+
+    async function insertRows(rows) {
+      let total = 0;
+      for (let i = 0; i < rows.length; i += 100) {
+        const chunk = rows.slice(i, i + 100);
+        const { error } = await supabaseClient.from(CONFIG.table).insert(chunk);
+        if (error) throw new Error(`${TEXT.insertFail}: ${error.message}`);
+        total += chunk.length;
+      }
+      return total;
+    }
+
+    els.parseBtn.onclick = async () => {
+      const file = els.file.files && els.file.files[0];
+      if (!file) return toast(TEXT.choose);
+      try {
+        setState(TEXT.reading);
+        els.uploadBtn.disabled = true;
+        const rows = await loadExcel(file);
+        updatePreview(rows);
+        setState(`\u5df2\u8bfb\u53d6 ${rows.length} \u6761 SKU`);
+        toast(TEXT.readOk);
+      } catch (err) {
+        parsed = [];
+        els.uploadBtn.disabled = true;
+        setState(TEXT.readFail, false);
+        els.preview.textContent = String(err.message || err);
+        toast(TEXT.readFail);
+      }
+    };
+
+    els.uploadBtn.onclick = async () => {
+      if (!parsed.length) return toast(TEXT.uploadFirst);
+      const dates = [...new Set(parsed.map(r => r.shoot_date))].sort();
+      const ok = confirm(`${TEXT.confirmA}\n${dates.join("、")}\n\n${TEXT.confirmB}`);
+      if (!ok) return;
+      try {
+        els.uploadBtn.disabled = true;
+        setState(TEXT.deleteOld);
+        await deleteExistingDates(dates);
+        setState(TEXT.insertNew);
+        const count = await insertRows(parsed);
+        setState(`\u8986\u76d6\u4e0a\u4f20\u6210\u529f\uff1a${count} \u6761 SKU`);
+        toast(TEXT.uploadOk);
+      } catch (err) {
+        els.uploadBtn.disabled = false;
+        setState(TEXT.uploadFail, false);
+        els.preview.textContent = `${els.preview.textContent}\n\n${TEXT.failReason}: ${String(err.message || err)}`;
+        toast(TEXT.uploadFail);
+      }
+    };
+
+    els.clearBtn.onclick = () => {
+      parsed = [];
+      els.file.value = "";
+      els.preview.textContent = TEXT.emptyPreview;
+      els.statDates.textContent = "0";
+      els.statPeople.textContent = "0";
+      els.statSku.textContent = "0";
+      els.uploadBtn.disabled = true;
+      setState(TEXT.choose);
+    };
+  </script>
+</body>
+</html>
