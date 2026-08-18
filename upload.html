@@ -254,7 +254,7 @@
       const rawItems = [];
       const assignments = [];
       let assignmentStarted = false;
-      for (let r = block.dateRow + 1; r < rows.length; r++) {
+      for (let r = block.dateRow; r < rows.length; r++) {
         const text = norm(rows[r]?.[block.codeCol]);
         if (!text) continue;
         const assignment = parseAssignmentLine(text);
