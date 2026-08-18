@@ -284,18 +284,6 @@
       return out;
     }
 
-    function dedupeRows(rows) {
-      const seen = new Set();
-      const out = [];
-      for (const row of rows) {
-        const key = `${row.shoot_date}|${row.photographer}|${row.sku}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push(row);
-      }
-      return out;
-    }
-
     async function loadExcel(file) {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
@@ -307,7 +295,7 @@
         if (standardRows.length) allRows.push(...standardRows);
         else allRows.push(...parseAssignmentTable(rows));
       }
-      const parsedRows = dedupeRows(allRows);
+      const parsedRows = allRows;
       if (!parsedRows.length) throw new Error(TEXT.noData);
       return parsedRows;
     }
@@ -341,9 +329,7 @@
       let total = 0;
       for (let i = 0; i < rows.length; i += 100) {
         const chunk = rows.slice(i, i + 100);
-        const { error } = await supabaseClient
-          .from(CONFIG.table)
-          .upsert(chunk, { onConflict: "shoot_date,photographer,sku" });
+        const { error } = await supabaseClient.from(CONFIG.table).insert(chunk);
         if (error) throw new Error(`${TEXT.insertFail}: ${error.message}`);
         total += chunk.length;
       }
