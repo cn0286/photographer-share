@@ -87,12 +87,12 @@
     <div class="copy-box">
       <div class="copy-head">
         <span>手动复制</span>
-        <button type="button" onclick="closeCopyModal()">关闭</button>
+        <button type="button" id="closeCopyModalBtn">关闭</button>
       </div>
       <textarea id="copyFallbackText" readonly></textarea>
       <div class="copy-actions">
-        <button type="button" onclick="selectFallbackText()">全选内容</button>
-        <button type="button" onclick="closeCopyModal()">完成</button>
+        <button type="button" id="selectCopyTextBtn">全选内容</button>
+        <button type="button" id="doneCopyModalBtn">完成</button>
       </div>
     </div>
   </div>
@@ -102,6 +102,7 @@
       url: "https://plrqzyojekqouyljfihe.supabase.co",
       anonKey: "sb_publishable_NZVl4VRf6nozXwHOyWmfUg_No564-Xi",
       table: "sku_records",
+      viewLogTable: "view_logs",
       realtimeSchema: "public"
     };
 
@@ -126,7 +127,11 @@
     const toast = document.getElementById("toast");
     const copyModal = document.getElementById("copyModal");
     const copyFallbackText = document.getElementById("copyFallbackText");
+    const closeCopyModalBtn = document.getElementById("closeCopyModalBtn");
+    const selectCopyTextBtn = document.getElementById("selectCopyTextBtn");
+    const doneCopyModalBtn = document.getElementById("doneCopyModalBtn");
     const nameCollator = new Intl.Collator("zh-Hans-u-co-pinyin", { sensitivity: "base", numeric: true });
+    let copyStore = {};
     const photographerRoster = [
       "祝宜舜",
       "陈灿",
@@ -145,6 +150,7 @@
     ].sort(nameCollator.compare);
     const hiddenPhotographers = new Set(["付显锋"]);
     const hiddenDates = new Set(["8.8日", "8.8", "2026-8.8日", "2026-08-08"]);
+    const viewLogCache = new Set();
 
     function esc(s) {
       return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -183,6 +189,7 @@
         showToast("没有可复制内容");
         return;
       }
+      openCopyModal(content);
       try {
         if (!navigator.clipboard || !window.isSecureContext) throw new Error("clipboard unavailable");
         await navigator.clipboard.writeText(content);
@@ -202,8 +209,28 @@
           if (!ok) throw new Error("execCommand failed");
           showToast("已复制");
         } catch (_fallbackErr) {
-          openCopyModal(content);
+          showToast("请按 Ctrl+C 复制");
         }
+      }
+    }
+
+    async function recordView(reason = "open") {
+      const selectedName = nameSelect.value.trim();
+      const selectedDate = dateSelect.value.trim();
+      const visitorName = selectedName || "未选择摄影师";
+      const cacheKey = `${visitorName}|${selectedDate}|${reason}`;
+      if (viewLogCache.has(cacheKey)) return;
+      viewLogCache.add(cacheKey);
+      try {
+        await supabaseClient.from(CONFIG.viewLogTable).insert({
+          visitor_name: visitorName,
+          viewed_date: selectedDate || null,
+          page_url: window.location.href.split("#")[0],
+          user_agent: navigator.userAgent || "",
+          reason
+        });
+      } catch (_err) {
+        // 访问记录失败不影响摄影师正常查看。
       }
     }
 
@@ -391,6 +418,8 @@
       const rows = filteredRows();
       const selectedName = nameSelect.value.trim();
       const displayNames = selectedName ? [selectedName] : photographerRoster;
+      copyStore = {};
+      let copyIndex = 0;
       statRows.textContent = rows.length;
       statDates.textContent = allDates().length;
       statPeople.textContent = displayNames.length;
@@ -433,13 +462,17 @@
           const skus = skuGroups.flatMap(sub => sub.skus);
           const status = items[0]?.status || "";
           const remark = items[0]?.remark || "";
+          const skuCopyKey = `sku-${copyIndex++}`;
+          const messageCopyKey = `msg-${copyIndex++}`;
+          copyStore[skuCopyKey] = skus.join("\n");
+          copyStore[messageCopyKey] = buildCompleteMessage({ shoot_date: shootDate, photographer: name }, skuGroups);
           return `
             <article class="card">
               <div class="card-head">
                 <div class="name">${esc(name)}</div>
                 <div class="tools">
-                  <button type="button" onclick="copyText(${JSON.stringify(skus.join('\\n'))})">复制 SKU</button>
-                  <button type="button" onclick="copyText(${JSON.stringify(buildCompleteMessage({ shoot_date: shootDate, photographer: name }, skuGroups))})">复制完整消息</button>
+                  <button type="button" data-copy-key="${esc(skuCopyKey)}">复制 SKU</button>
+                  <button type="button" data-copy-key="${esc(messageCopyKey)}">复制完整消息</button>
                 </div>
               </div>
               <div class="meta">${esc(shootDate)}　${esc(status)}　${esc(remark)}　总数：${skus.length}</div>
@@ -519,13 +552,31 @@
     dateSelect.addEventListener("change", () => {
       refreshNames();
       render();
+      recordView("date_change");
     });
 
-    nameSelect.addEventListener("change", render);
+    nameSelect.addEventListener("change", () => {
+      render();
+      recordView("name_change");
+    });
     skuInput.addEventListener("input", render);
+    result.addEventListener("click", event => {
+      const button = event.target.closest("[data-copy-key]");
+      if (!button) return;
+      copyText(copyStore[button.dataset.copyKey] || "");
+    });
+    closeCopyModalBtn.addEventListener("click", closeCopyModal);
+    doneCopyModalBtn.addEventListener("click", closeCopyModal);
+    selectCopyTextBtn.addEventListener("click", selectFallbackText);
+    copyModal.addEventListener("click", event => {
+      if (event.target === copyModal) closeCopyModal();
+    });
 
     loadRows()
-      .then(setupRealtime)
+      .then(() => {
+        setupRealtime();
+        recordView("open");
+      })
       .catch(err => {
         result.innerHTML = `<div class="empty">加载失败：${esc(err?.message || err)}</div>`;
       });
