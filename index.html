@@ -18,6 +18,8 @@
     .hint { color: #8a94a6; font-size: 12px; margin-left: 4px; }
     select, input { height: 34px; padding: 0 10px; border: 1px solid #c8d0da; border-radius: 6px; min-width: 160px; background: #fff; }
     input { min-width: 220px; }
+    button { height: 34px; border: 1px solid #c8d0da; border-radius: 6px; padding: 0 12px; background: #fff; cursor: pointer; font-family: inherit; }
+    .copy-current { background: #2563eb; border-color: #2563eb; color: #fff; }
     main { padding: 18px 24px; }
     .stats { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
     .stat { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 12px 14px; }
@@ -73,6 +75,7 @@
     <select id="name"><option value="">全部摄影师</option></select>
     <label>SKU</label>
     <input id="sku" placeholder="筛选 SKU，支持部分编码">
+    <button type="button" class="copy-current" id="copyCurrentSkuBtn">复制当前摄影师当日全部 SKU</button>
   </section>
   <main>
     <section class="stats">
@@ -130,6 +133,7 @@
     const closeCopyModalBtn = document.getElementById("closeCopyModalBtn");
     const selectCopyTextBtn = document.getElementById("selectCopyTextBtn");
     const doneCopyModalBtn = document.getElementById("doneCopyModalBtn");
+    const copyCurrentSkuBtn = document.getElementById("copyCurrentSkuBtn");
     const nameCollator = new Intl.Collator("zh-Hans-u-co-pinyin", { sensitivity: "base", numeric: true });
     let copyStore = {};
     const photographerRoster = [
@@ -363,6 +367,28 @@
       return lines.join("\n");
     }
 
+    function currentSkuText() {
+      const rows = filteredRows();
+      const selectedName = nameSelect.value.trim();
+      const selectedDate = dateSelect.value.trim();
+      if (!selectedName) return "";
+      const skus = rows
+        .filter(row => row.photographer === selectedName)
+        .filter(row => !selectedDate || row.shoot_date === selectedDate)
+        .map(row => String(row.sku || "").trim())
+        .filter(Boolean);
+      return skus.join("\n");
+    }
+
+    function updateCopyCurrentButton() {
+      const selectedName = nameSelect.value.trim();
+      const count = currentSkuText().split("\n").filter(Boolean).length;
+      copyCurrentSkuBtn.disabled = !selectedName || count === 0;
+      copyCurrentSkuBtn.textContent = selectedName && count
+        ? `复制${selectedName}当日全部 SKU（${count}）`
+        : "复制当前摄影师当日全部 SKU";
+    }
+
     function refreshYears() {
       const keep = yearSelect.value;
       const list = years();
@@ -424,6 +450,7 @@
       statDates.textContent = allDates().length;
       statPeople.textContent = displayNames.length;
       updatedAt.textContent = state.updatedAt || "--";
+      updateCopyCurrentButton();
 
       const grouped = [];
       const map = new Map();
@@ -560,6 +587,14 @@
       recordView("name_change");
     });
     skuInput.addEventListener("input", render);
+    copyCurrentSkuBtn.addEventListener("click", () => {
+      const selectedName = nameSelect.value.trim();
+      if (!selectedName) {
+        showToast("请先选择摄影师");
+        return;
+      }
+      copyText(currentSkuText());
+    });
     result.addEventListener("click", event => {
       const button = event.target.closest("[data-copy-key]");
       if (!button) return;
