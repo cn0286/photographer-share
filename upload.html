@@ -26,6 +26,11 @@
     .status { font-size: 13px; color: #667085; }
     .muted { color: #667085; font-size: 13px; line-height: 1.7; }
     .preview { white-space: pre-wrap; font-family: Consolas, "Microsoft YaHei", monospace; background: #fafbfc; border: 1px solid #e3e8f0; border-radius: 8px; padding: 12px; min-height: 260px; max-height: 520px; overflow: auto; }
+    .log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .log-table th, .log-table td { border-bottom: 1px solid #e3e8f0; padding: 9px 8px; text-align: left; vertical-align: top; }
+    .log-table th { color: #667085; font-weight: 600; background: #fafbfc; }
+    .log-table td { color: #344054; }
+    .log-empty { color: #667085; padding: 12px 0; }
     .stats { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
     .stat { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 12px 14px; }
     .stat span { display: block; color: #667085; font-size: 12px; margin-bottom: 4px; }
@@ -71,6 +76,17 @@
       <div class="muted" style="margin-bottom: 8px;">&#35299;&#26512;&#39044;&#35272;</div>
       <div id="preview" class="preview">&#23578;&#26410;&#35835;&#21462;&#25991;&#20214;&#12290;</div>
     </div>
+
+    <div class="card">
+      <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
+        <div>
+          <strong>&#26368;&#36817;&#26597;&#30475;&#35760;&#24405;</strong>
+          <div class="muted" id="logSummary">&#23578;&#26410;&#35835;&#21462;&#35760;&#24405;</div>
+        </div>
+        <button class="ghost" id="refreshLogsBtn">&#21047;&#26032;&#35760;&#24405;</button>
+      </div>
+      <div id="logList" class="log-empty">&#27491;&#22312;&#35835;&#21462;&#35760;&#24405;...</div>
+    </div>
   </div>
 
   <div class="toast" id="toast">&#24050;&#23436;&#25104;</div>
@@ -79,7 +95,8 @@
     const CONFIG = {
       url: "https://plrqzyojekqouyljfihe.supabase.co",
       anonKey: "sb_publishable_NZVl4VRf6nozXwHOyWmfUg_No564-Xi",
-      table: "sku_records"
+      table: "sku_records",
+      viewLogTable: "view_logs"
     };
 
     const TEXT = {
@@ -119,6 +136,9 @@
       statPeople: document.getElementById("statPeople"),
       statSku: document.getElementById("statSku"),
       statState: document.getElementById("statState"),
+      refreshLogsBtn: document.getElementById("refreshLogsBtn"),
+      logSummary: document.getElementById("logSummary"),
+      logList: document.getElementById("logList"),
       toast: document.getElementById("toast")
     };
 
@@ -336,6 +356,68 @@
       return total;
     }
 
+    function formatLogTime(value) {
+      if (!value) return "-";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString("zh-CN", { hour12: false });
+    }
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      }[ch]));
+    }
+
+    async function loadViewLogs() {
+      els.logList.textContent = "正在读取记录...";
+      const { data, error } = await supabaseClient
+        .from(CONFIG.viewLogTable)
+        .select("visitor_name, viewed_date, viewed_at, reason")
+        .order("viewed_at", { ascending: false })
+        .limit(80);
+      if (error) {
+        els.logSummary.textContent = "读取失败，请确认已经执行新版 SQL";
+        els.logList.textContent = error.message;
+        return;
+      }
+      const logs = data || [];
+      const people = [...new Set(logs.map(item => item.visitor_name).filter(Boolean))];
+      els.logSummary.textContent = `最近 ${logs.length} 条，涉及 ${people.length} 位摄影师/访问者`;
+      if (!logs.length) {
+        els.logList.className = "log-empty";
+        els.logList.textContent = "暂无查看记录。摄影师打开前台页面后，这里会自动出现。";
+        return;
+      }
+      els.logList.className = "";
+      els.logList.innerHTML = `
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>打开时间</th>
+              <th>摄影师</th>
+              <th>查看日期</th>
+              <th>动作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${logs.map(item => `
+              <tr>
+                <td>${esc(formatLogTime(item.viewed_at))}</td>
+                <td>${esc(item.visitor_name || "未选择摄影师")}</td>
+                <td>${esc(item.viewed_date || "-")}</td>
+                <td>${esc(item.reason === "name_change" ? "切换摄影师" : item.reason === "date_change" ? "切换日期" : "打开页面")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
     els.parseBtn.onclick = async () => {
       const file = els.file.files && els.file.files[0];
       if (!file) return toast(TEXT.choose);
@@ -386,6 +468,9 @@
       els.uploadBtn.disabled = true;
       setState(TEXT.choose);
     };
+
+    els.refreshLogsBtn.onclick = () => loadViewLogs();
+    loadViewLogs();
   </script>
 </body>
 </html>
