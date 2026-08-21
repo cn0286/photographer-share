@@ -162,6 +162,23 @@
       }[c]));
     }
 
+    function normalizePhotographer(value) {
+      return String(value ?? "")
+        .normalize("NFKC")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/\u00a0/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function photographerKey(value) {
+      return normalizePhotographer(value).replace(/\s+/g, "").toLowerCase();
+    }
+
+    function samePhotographer(a, b) {
+      return photographerKey(a) === photographerKey(b);
+    }
+
     function showToast(text) {
       toast.textContent = text;
       toast.classList.add("show");
@@ -238,28 +255,72 @@
       }
     }
 
-    function normalizeDate(value) {
-      const text = String(value || "");
-      const yearMatch = text.match(/(20\d{2}|19\d{2})/);
-      if (yearMatch) return yearMatch[1] + "-" + text.replace(yearMatch[1], "").trim();
-      return text.trim();
+    function parseDateParts(value) {
+      const text = String(value ?? "").trim();
+      if (!text) return null;
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return {
+          year: value.getFullYear(),
+          month: value.getMonth() + 1,
+          day: value.getDate()
+        };
+      }
+      if (/^\d{5}$/.test(text)) {
+        const utcDays = Math.floor(Number(text) - 25569);
+        const date = new Date(utcDays * 86400 * 1000);
+        if (!Number.isNaN(date.getTime())) {
+          return {
+            year: date.getUTCFullYear(),
+            month: date.getUTCMonth() + 1,
+            day: date.getUTCDate()
+          };
+        }
+      }
+      let match = text.match(/(20\d{2}|19\d{2})\D*(\d{1,2})\D*(\d{1,2})/);
+      if (match) {
+        return {
+          year: Number(match[1]),
+          month: Number(match[2]),
+          day: Number(match[3])
+        };
+      }
+      match = text.match(/^(\d{1,2})\D*(\d{1,2})/);
+      if (match) {
+        return {
+          year: new Date().getFullYear(),
+          month: Number(match[1]),
+          day: Number(match[2])
+        };
+      }
+      return null;
+    }
+
+    function canonicalDate(value) {
+      const parts = parseDateParts(value);
+      if (!parts) return String(value ?? "").trim();
+      return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+    }
+
+    function sameDate(a, b) {
+      const left = canonicalDate(a);
+      const right = canonicalDate(b);
+      return left && right && left === right;
     }
 
     function isHiddenDate(value) {
       const text = String(value || "").trim();
-      const normalized = normalizeDate(text);
+      const normalized = canonicalDate(text);
       return hiddenDates.has(text) || hiddenDates.has(normalized);
     }
 
     function yearOfDate(date) {
-      const text = String(date || "");
-      const match = text.match(/(20\d{2}|19\d{2})/);
-      return match ? match[1] : "";
+      const parts = parseDateParts(date);
+      return parts ? String(parts.year) : "";
     }
 
     function monthOfDate(date) {
-      const month = dateSortKey(date)[1];
-      return month ? String(month).padStart(2, "0") : "";
+      const parts = parseDateParts(date);
+      return parts ? String(parts.month).padStart(2, "0") : "";
     }
 
     function monthLabel(month) {
@@ -276,7 +337,7 @@
     }
 
     function allDates() {
-      return [...new Set(state.rows.map(r => r.shoot_date).filter(d => !isHiddenDate(d)))].filter(Boolean).sort((a, b) => {
+      return [...new Set(state.rows.map(r => canonicalDate(r.shoot_date)).filter(d => d && !isHiddenDate(d)))].sort((a, b) => {
         const ka = dateSortKey(a), kb = dateSortKey(b);
         for (let i = 0; i < 4; i++) if (ka[i] !== kb[i]) return ka[i] > kb[i] ? 1 : -1;
         return 0;
@@ -304,11 +365,12 @@
     }
 
     function namesForDate(date) {
+      const targetDate = canonicalDate(date);
       const names = state.rows
-        .filter(r => !hiddenPhotographers.has(r.photographer))
+        .filter(r => !hiddenPhotographers.has(normalizePhotographer(r.photographer)))
         .filter(r => !isHiddenDate(r.shoot_date))
-        .filter(r => !date || r.shoot_date === date)
-        .map(r => r.photographer)
+        .filter(r => !targetDate || sameDate(r.shoot_date, targetDate))
+        .map(r => normalizePhotographer(r.photographer))
         .filter(Boolean);
       const detected = [...new Set(names)].sort(nameCollator.compare);
       const merged = [...new Set([...photographerRoster, ...detected])];
@@ -322,12 +384,13 @@
       const selectedName = nameSelect.value;
       const keyword = skuInput.value.trim().toLowerCase();
       return state.rows.filter(row => {
-        if (hiddenPhotographers.has(row.photographer)) return false;
+        const photographer = normalizePhotographer(row.photographer);
+        if (hiddenPhotographers.has(photographer)) return false;
         if (isHiddenDate(row.shoot_date)) return false;
         if (y && yearOfDate(row.shoot_date) !== y) return false;
         if (m && monthOfDate(row.shoot_date) !== m) return false;
-        if (d && row.shoot_date !== d) return false;
-        if (selectedName && row.photographer !== selectedName) return false;
+        if (d && !sameDate(row.shoot_date, d)) return false;
+        if (selectedName && !samePhotographer(photographer, selectedName)) return false;
         if (keyword && !String(row.sku || "").toLowerCase().includes(keyword)) return false;
         return true;
       });
@@ -370,11 +433,11 @@
     function currentSkuText() {
       const rows = filteredRows();
       const selectedName = nameSelect.value.trim();
-      const selectedDate = dateSelect.value.trim();
+      const selectedDate = canonicalDate(dateSelect.value.trim());
       if (!selectedName) return "";
       const skus = rows
-        .filter(row => row.photographer === selectedName)
-        .filter(row => !selectedDate || row.shoot_date === selectedDate)
+        .filter(row => samePhotographer(row.photographer, selectedName))
+        .filter(row => !selectedDate || sameDate(row.shoot_date, selectedDate))
         .map(row => String(row.sku || "").trim())
         .filter(Boolean);
       return skus.join("\n");
@@ -463,10 +526,10 @@
         map.get(key).items.push(row);
       }
 
-      const currentDate = dateSelect.value;
+      const currentDate = canonicalDate(dateSelect.value);
       result.innerHTML = displayNames.map(name => {
-        const personRows = rows.filter(r => r.photographer === name);
-        const personDateRows = currentDate ? personRows.filter(r => r.shoot_date === currentDate) : personRows;
+        const personRows = rows.filter(r => samePhotographer(r.photographer, name));
+        const personDateRows = currentDate ? personRows.filter(r => sameDate(r.shoot_date, currentDate)) : personRows;
         if (!personDateRows.length) {
           return `
             <article class="card">
@@ -531,7 +594,14 @@
 
       state.loading = false;
       if (error) throw error;
-      state.rows = data || [];
+      state.rows = (data || []).map(row => ({
+        ...row,
+        shoot_date: canonicalDate(row.shoot_date),
+        photographer: normalizePhotographer(row.photographer),
+        sku: String(row.sku ?? "").trim(),
+        status: String(row.status ?? "").trim(),
+        remark: String(row.remark ?? "").trim()
+      }));
       state.updatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
       refreshYears();
       syncDefaultDatePath();
