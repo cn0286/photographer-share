@@ -12,6 +12,7 @@
     body { margin: 0; font-family: "Microsoft YaHei", Arial, sans-serif; color: #1f2937; background: #f4f6f8; }
     header { padding: 18px 24px; background: #fff; border-bottom: 1px solid #dde3ea; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     h1 { margin: 0; font-size: 20px; }
+    .version { color: #667085; font-size: 12px; margin-top: 6px; }
     .updated { color: #667085; font-size: 13px; white-space: nowrap; }
     .controls { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 24px; background: #fff; border-bottom: 1px solid #dde3ea; align-items: center; }
     label { font-size: 13px; color: #4b5563; }
@@ -61,7 +62,10 @@
 </head>
 <body>
   <header>
-    <h1>摄影师共享 SKU 查看页</h1>
+    <div>
+      <h1>摄影师共享 SKU 查看页</h1>
+      <div class="version">版本：2026-08-21-读取全部数据版</div>
+    </div>
     <div class="updated">最后更新时间：<span id="updatedAt">--</span></div>
   </header>
   <section class="controls">
@@ -506,7 +510,7 @@
     function render() {
       const rows = filteredRows();
       const selectedName = nameSelect.value.trim();
-      const displayNames = selectedName ? [selectedName] : photographerRoster;
+      const displayNames = selectedName ? [selectedName] : namesForDate(dateSelect.value);
       copyStore = {};
       let copyIndex = 0;
       statRows.textContent = rows.length;
@@ -531,12 +535,14 @@
         const personRows = rows.filter(r => samePhotographer(r.photographer, name));
         const personDateRows = currentDate ? personRows.filter(r => sameDate(r.shoot_date, currentDate)) : personRows;
         if (!personDateRows.length) {
+          const dateRowsCount = currentDate ? rows.filter(r => sameDate(r.shoot_date, currentDate)).length : rows.length;
           return `
             <article class="card">
               <div class="card-head">
                 <div class="name">${esc(name)}</div>
               </div>
               <div class="meta">当日暂无样品</div>
+              <div class="meta">诊断：当前日期共读取 ${dateRowsCount} 条；${esc(name)} 匹配 0 条</div>
               <div class="empty-inline">当日暂无样品</div>
             </article>
           `;
@@ -585,16 +591,29 @@
 
     async function loadRows() {
       state.loading = true;
-      const { data, error } = await supabaseClient
-        .from(CONFIG.table)
-        .select("shoot_date, photographer, sku, status, remark, updated_at, created_at")
-        .order("shoot_date", { ascending: true })
-        .order("photographer", { ascending: true })
-        .order("created_at", { ascending: true });
+      const pageSize = 1000;
+      const allData = [];
+      for (let from = 0; ; from += pageSize) {
+        const to = from + pageSize - 1;
+        const { data, error } = await supabaseClient
+          .from(CONFIG.table)
+          .select("shoot_date, photographer, sku, status, remark, updated_at, created_at")
+          .order("shoot_date", { ascending: true })
+          .order("photographer", { ascending: true })
+          .order("created_at", { ascending: true })
+          .range(from, to);
+
+        if (error) {
+          state.loading = false;
+          throw error;
+        }
+        const chunk = data || [];
+        allData.push(...chunk);
+        if (chunk.length < pageSize) break;
+      }
 
       state.loading = false;
-      if (error) throw error;
-      state.rows = (data || []).map(row => ({
+      state.rows = allData.map(row => ({
         ...row,
         shoot_date: canonicalDate(row.shoot_date),
         photographer: normalizePhotographer(row.photographer),
