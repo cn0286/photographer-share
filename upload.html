@@ -161,6 +161,14 @@
       return String(value ?? "").replace(/\u00a0/g, " ").trim();
     }
 
+    function normalizePhotographer(value) {
+      return norm(value)
+        .normalize("NFKC")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/\u00a0/g, " ")
+        .replace(/\s+/g, " ");
+    }
+
     function excelSerialToDate(serial) {
       const utcDays = Math.floor(Number(serial) - 25569);
       const date = new Date(utcDays * 86400 * 1000);
@@ -248,14 +256,14 @@
       for (let r = match.headerRow + 1; r < rows.length; r++) {
         const row = rows[r] || [];
         const date = normalizeDate(row[match.headers.date]) || lastDate;
-        const photographer = norm(row[match.headers.name]) || lastName;
+        const photographer = normalizePhotographer(row[match.headers.name]) || lastName;
         const sku = norm(row[match.headers.sku]);
         const remark = match.headers.remark !== undefined ? norm(row[match.headers.remark]) : "";
         const status = match.headers.status !== undefined ? norm(row[match.headers.status]) : TEXT.waitShoot;
         if (normalizeDate(row[match.headers.date])) lastDate = date;
-        if (norm(row[match.headers.name])) lastName = photographer;
+        if (normalizePhotographer(row[match.headers.name])) lastName = photographer;
         if (!date || !photographer || !sku) continue;
-        out.push({ shoot_date: date, photographer, sku, status: status || TEXT.waitShoot, remark });
+        out.push({ shoot_date: normalizeDate(date), photographer, sku, status: status || TEXT.waitShoot, remark });
       }
       return out;
     }
@@ -291,7 +299,7 @@
         for (const index of assignment.indexes) {
           const sku = rawItems[index - 1];
           if (!sku) continue;
-          out.push({ shoot_date: block.date, photographer: assignment.name, sku, status: TEXT.waitShoot, remark: "" });
+          out.push({ shoot_date: normalizeDate(block.date), photographer: normalizePhotographer(assignment.name), sku: norm(sku), status: TEXT.waitShoot, remark: "" });
         }
       }
       return out;
@@ -315,7 +323,13 @@
         if (standardRows.length) allRows.push(...standardRows);
         else allRows.push(...parseAssignmentTable(rows));
       }
-      const parsedRows = allRows;
+      const parsedRows = allRows.map(row => ({
+        shoot_date: normalizeDate(row.shoot_date),
+        photographer: normalizePhotographer(row.photographer),
+        sku: norm(row.sku),
+        status: norm(row.status) || TEXT.waitShoot,
+        remark: norm(row.remark)
+      }));
       if (!parsedRows.length) throw new Error(TEXT.noData);
       return parsedRows;
     }
